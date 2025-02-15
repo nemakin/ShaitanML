@@ -150,10 +150,8 @@ end = struct
     return (Map.singleton (module Int) k v)
   ;;
 
-  (* let find s k = Map.find s k *)
   let find = Map.find
 
-  (* let remove s k = Map.remove s k *)
   let remove = Map.remove
 
   let apply s =
@@ -236,7 +234,6 @@ module TypeEnv = struct
 
   let extend env (v, scheme) = Map.update env v ~f:(fun _ -> scheme)
 
-  (* let remove e k = Map.remove e k *)
   let remove = Map.remove
   let empty = Map.empty (module String)
 
@@ -334,9 +331,13 @@ let infer_pat =
     | PCons (p1, p2) ->
       let* env1, t1 = helper env p1 in
       let* env2, t2 = helper env1 p2 in
-      let* sub = Subst.unify (list_typ t1) t2 in
-      let env = TypeEnv.apply sub env2 in
-      return (env, Subst.apply sub t2)
+      let* fresh = fresh_var in
+      let* sub_uni = Subst.unify t2 (list_typ fresh) in
+      let t2 = Subst.apply sub_uni t2 in
+      let* s3 = Subst.unify (list_typ t1) t2 in
+      let* final_sub = Subst.compose_all [s3; sub_uni] in
+      let env = TypeEnv.apply final_sub env2 in
+      return (env, Subst.apply final_sub t2)
     | PTuple pl ->
       let* env, tl =
         List.fold_left
@@ -452,9 +453,9 @@ let infer_exp =
     | ECons (e1, e2) ->
       let* s1, t1 = helper env e1 in
       let* s2, t2 = helper env e2 in
-      let* sub = Subst.unify (list_typ t1) t2 in
-      let t = Subst.apply sub t2 in
-      let* sub = Subst.compose_all [ s1; s2; sub ] in
+      let* s3 = Subst.unify (list_typ t1) t2 in
+      let t = Subst.apply s3 t2 in
+      let* sub = Subst.compose_all [ s1; s2; s3 ] in
       return (sub, t)
     | EApply (e1, e2) ->
       let* fresh = fresh_var in
